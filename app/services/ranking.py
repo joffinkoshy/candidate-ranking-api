@@ -2,6 +2,9 @@ from typing import List
 from app.schemas import Candidate, RankedCandidate
 
 def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
+    if not candidates:
+        return []
+
     scored = []
 
     for candidate in candidates:
