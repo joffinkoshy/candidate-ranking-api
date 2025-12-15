@@ -1,11 +1,26 @@
 from typing import List
 from app.schemas import Candidate, RankedCandidate
 
+def min_max_normalize(values):
+    min_val = min(values)
+    max_val = max(values)
+
+    if min_val == max_val:
+        return [0.5 for _ in values]
+
+    return [(v - min_val) / (max_val - min_val) for v in values]
+
+
 def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
     if not candidates:
         return []
 
     scored = []
+    exp_values = [c.years_experience for c in candidates]
+    salary_values = [c.salary_expectation for c in candidates]
+
+    norm_exp = min_max_normalize(exp_values)
+    norm_salary = min_max_normalize(salary_values)
 
     WEIGHTS = {
         "experience": 0.4,
@@ -14,12 +29,12 @@ def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
         "salary": 0.1
     }
 
-    for candidate in candidates:
+    for idx,candidate in enumerate(candidates):
         score = (
-                WEIGHTS["experience"] * candidate.years_experience
+                WEIGHTS["experience"] * norm_exp[idx]
                 + WEIGHTS["skill"] * candidate.skill_match_score
                 + WEIGHTS["interview"] * candidate.interview_score
-                - WEIGHTS["salary"] * candidate.salary_expectation
+                - WEIGHTS["salary"] * norm_salary[idx]
         )
 
         scored.append({
@@ -27,7 +42,9 @@ def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
             "final_score": score
         })
 
-    scored.sort(key=lambda x: x["final_score"], reverse=True)
+    scored.sort(
+        key=lambda x: (-x["final_score"], -x["years_experience"])
+    )
 
     ranked = []
 

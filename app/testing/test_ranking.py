@@ -23,3 +23,8 @@ def test_candidates_are_ranked_by_score():
 
     assert ranked[0].candidate_id == "B"
     assert ranked[1].candidate_id == "A"
+
+def test_empty_candidate_list_returns_empty_result():
+    ranked = rank_candidates_logic([])
+    assert ranked == []
+
