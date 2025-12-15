@@ -1,5 +1,11 @@
 from typing import List
 from app.schemas import Candidate, RankedCandidate
+import joblib
+import numpy as np
+
+MODEL_TYPE = "linear"  # options: "linear", "gboost"
+MODEL_PATH = "app/ml/models/linear.pkl"
+MODEL = joblib.load(MODEL_PATH)
 
 def min_max_normalize(values):
     min_val = min(values)
@@ -22,20 +28,15 @@ def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
     norm_exp = min_max_normalize(exp_values)
     norm_salary = min_max_normalize(salary_values)
 
-    WEIGHTS = {
-        "experience": 0.4,
-        "skill": 0.4,
-        "interview": 0.3,
-        "salary": 0.1
-    }
-
     for idx,candidate in enumerate(candidates):
-        score = (
-                WEIGHTS["experience"] * norm_exp[idx]
-                + WEIGHTS["skill"] * candidate.skill_match_score
-                + WEIGHTS["interview"] * candidate.interview_score
-                - WEIGHTS["salary"] * norm_salary[idx]
-        )
+        features = np.array([
+            norm_exp[idx],
+            candidate.skill_match_score,
+            candidate.interview_score,
+            norm_salary[idx]
+        ]).reshape(1, -1)
+
+        score = MODEL.predict(features)[0]
 
         scored.append({
             "candidate_id": candidate.candidate_id,
@@ -43,7 +44,7 @@ def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
         })
 
     scored.sort(
-        key=lambda x: (-x["final_score"], -x["years_experience"])
+        key=lambda x: (-x["final_score"], x["candidate_id"])
     )
 
     ranked = []
