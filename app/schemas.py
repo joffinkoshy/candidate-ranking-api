@@ -11,6 +11,7 @@ class Candidate(BaseModel): # for one candidate
 
 class RankCandidatesRequest(BaseModel): # list of candidates each list applying for unique job_id
     job_id: str
+    job_description:str
     candidates: List[Candidate]
 
 class RankedCandidate(BaseModel):
