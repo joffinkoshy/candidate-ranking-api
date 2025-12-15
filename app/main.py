@@ -17,7 +17,7 @@ def health_check():
 
 @app.post("/rank_candidates", response_model=RankCandidatesResponse)
 def rank_candidates(request: RankCandidatesRequest):
-    ranked_candidates = rank_candidates_logic(request.candidates)
+    ranked_candidates = rank_candidates_logic(request.candidates,request.job_description)
     return RankCandidatesResponse(ranked_candidates=ranked_candidates)
 
 
