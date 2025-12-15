@@ -20,4 +20,24 @@ class RankedCandidate(BaseModel):
 class RankCandidatesResponse(BaseModel):
     ranked_candidates: List[RankedCandidate]
 
+class JobText(BaseModel):
+    job_id:str
+    description:str
+
+class ResumeText(BaseModel):
+    candidate_id:str
+    resume_text:str
+
+class ResumeJobMatchRequest(BaseModel):
+    job:JobText
+    resumes:List[ResumeText]
+
+class ResumeMatchScore(BaseModel):
+    candidate_id: str
+    similarity_score: float
+
+class ResumeJobMatchResponse(BaseModel):
+    matches: List[ResumeMatchScore]
+
+
 
