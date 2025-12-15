@@ -8,6 +8,13 @@ app = FastAPI(title="Candidate Ranking API")
 def health_check():
     return {"status": "API is running"}
 
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "model_type": "linear"
+    }
+
 @app.post("/rank_candidates", response_model=RankCandidatesResponse)
 def rank_candidates(request: RankCandidatesRequest):
     ranked_candidates = rank_candidates_logic(request.candidates)

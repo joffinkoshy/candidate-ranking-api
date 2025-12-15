@@ -4,7 +4,14 @@ import joblib
 import numpy as np
 
 MODEL_TYPE = "linear"  # options: "linear", "gboost"
-MODEL_PATH = "app/ml/models/linear.pkl"
+
+if MODEL_TYPE == "linear":
+    MODEL_PATH = "app/ml/models/linear.pkl"
+elif MODEL_TYPE == "gboost":
+    MODEL_PATH = "app/ml/models/gboost.pkl"
+else:
+    raise ValueError("Invalid MODEL_TYPE")
+
 MODEL = joblib.load(MODEL_PATH)
 
 def min_max_normalize(values):
