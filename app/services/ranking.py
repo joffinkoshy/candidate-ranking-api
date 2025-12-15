@@ -7,12 +7,19 @@ def rank_candidates_logic(candidates: List[Candidate]) -> List[RankedCandidate]:
 
     scored = []
 
+    WEIGHTS = {
+        "experience": 0.4,
+        "skill": 0.4,
+        "interview": 0.3,
+        "salary": 0.1
+    }
+
     for candidate in candidates:
         score = (
-            0.3 * candidate.years_experience
-            + 0.4 * candidate.skill_match_score
-            + 0.3 * candidate.interview_score
-            - 0.2 * candidate.salary_expectation
+                WEIGHTS["experience"] * candidate.years_experience
+                + WEIGHTS["skill"] * candidate.skill_match_score
+                + WEIGHTS["interview"] * candidate.interview_score
+                - WEIGHTS["salary"] * candidate.salary_expectation
         )
 
         scored.append({
