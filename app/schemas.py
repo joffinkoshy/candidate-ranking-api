@@ -7,6 +7,7 @@ class Candidate(BaseModel): # for one candidate
     skill_match_score:float
     interview_score:float
     salary_expectation:float
+    resume:str
 
 class RankCandidatesRequest(BaseModel): # list of candidates each list applying for unique job_id
     job_id: str
@@ -28,9 +29,6 @@ class ResumeText(BaseModel):
     candidate_id:str
     resume_text:str
 
-class ResumeJobMatchRequest(BaseModel):
-    job:JobText
-    resumes:List[ResumeText]
 
 class ResumeMatchScore(BaseModel):
     candidate_id: str
