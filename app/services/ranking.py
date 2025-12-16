@@ -50,15 +50,21 @@ def rank_candidates_logic(
     """
     Rank candidates using structured ML score + semantic similarity.
     
+    This function accepts raw feature values and normalizes them internally:
+    - years_experience: Raw years (e.g., 5, 10, 15) → normalized 0-1 based on candidate pool
+    - skill_match_score: Raw score 0-100 → normalized 0-1
+    - interview_score: Raw score 0-100 → normalized 0-1
+    - salary_expectation: Raw salary → normalized 0-1 based on candidate pool (treated as negative signal)
+    
     Args:
-        candidates: List of Candidate objects to rank
+        candidates: List of Candidate objects with raw feature values
         job_description: Job description text for semantic matching
         
     Returns:
         List of RankedCandidate objects with ranks and final scores
         
     Raises:
-        ValueError: If input validation fails
+        ValueError: If input validation fails (e.g., scores outside 0-100 range)
         Exception: For processing errors
     """
     logger.info(f"Starting ranking process for {len(candidates)} candidates")
@@ -80,20 +86,35 @@ def rank_candidates_logic(
         if not candidate.resume_text or not candidate.resume_text.strip():
             logger.warning(f"Candidate {candidate.candidate_id} has empty resume text")
         
-        # Validate numeric ranges
-        if not (0 <= candidate.skill_match_score <= 1):
-            raise ValueError(f"Skill match score must be between 0 and 1, got {candidate.skill_match_score}")
+        # Validate numeric ranges for raw values
+        if not (0 <= candidate.skill_match_score <= 100):
+            raise ValueError(f"Skill match score must be between 0 and 100, got {candidate.skill_match_score}")
         
-        if not (0 <= candidate.interview_score <= 1):
-            raise ValueError(f"Interview score must be between 0 and 1, got {candidate.interview_score}")
+        if not (0 <= candidate.interview_score <= 100):
+            raise ValueError(f"Interview score must be between 0 and 100, got {candidate.interview_score}")
+        
+        if candidate.years_experience < 0:
+            raise ValueError(f"Years of experience cannot be negative, got {candidate.years_experience}")
+        
+        if candidate.salary_expectation < 0:
+            raise ValueError(f"Salary expectation cannot be negative, got {candidate.salary_expectation}")
 
-    # Collect values for normalization
+    # Normalize all features
     try:
+        # Normalize years of experience (0-1 scale based on candidate pool)
         exp_values = [c.years_experience for c in candidates]
-        salary_values = [c.salary_expectation for c in candidates]
-
         norm_exp = min_max_normalize(exp_values)
+        
+        # Normalize skill match score (0-100 → 0-1)
+        norm_skill = [c.skill_match_score / 100.0 for c in candidates]
+        
+        # Normalize interview score (0-100 → 0-1)
+        norm_interview = [c.interview_score / 100.0 for c in candidates]
+        
+        # Normalize salary expectation (0-1 scale based on candidate pool, but treat as negative)
+        salary_values = [c.salary_expectation for c in candidates]
         norm_salary = min_max_normalize(salary_values)
+        
     except Exception as e:
         logger.error(f"Normalization failed: {str(e)}")
         raise Exception("Failed to normalize candidate features")
@@ -107,8 +128,8 @@ def rank_candidates_logic(
             # -------------------------------
             features = np.array([
                 norm_exp[idx],
-                candidate.skill_match_score,
-                candidate.interview_score,
+                norm_skill[idx],
+                norm_interview[idx],
                 norm_salary[idx]
             ]).reshape(1, -1)
 

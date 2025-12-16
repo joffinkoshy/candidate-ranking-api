@@ -87,8 +87,8 @@ class TestErrorHandling:
             Candidate(
                 candidate_id="test",
                 years_experience=5,
-                skill_match_score=1.5,  # Invalid - should be <= 1.0
-                interview_score=0.7,
+                skill_match_score=150,  # Invalid - should be <= 100
+                interview_score=70,
                 salary_expectation=100000,
                 resume_text="Test resume"
             )
@@ -97,7 +97,7 @@ class TestErrorHandling:
         with pytest.raises(ValueError) as exc_info:
             rank_candidates_logic(candidates, "Test job")
         
-        assert "Skill match score must be between 0 and 1" in str(exc_info.value)
+        assert "Skill match score must be between 0 and 100" in str(exc_info.value)
     
     def test_missing_candidate_id(self):
         """Test error handling for missing candidate ID."""

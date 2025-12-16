@@ -24,24 +24,24 @@ class TestCompleteWorkflow:
                 {
                     "candidate_id": "candidate_1",
                     "years_experience": 7,
-                    "skill_match_score": 0.95,
-                    "interview_score": 0.9,
+                    "skill_match_score": 95,  # Raw score 0-100
+                    "interview_score": 90,   # Raw score 0-100
                     "salary_expectation": 150000,
                     "resume_text": "Senior ML Engineer with 7 years experience in Python, TensorFlow, and production ML systems. Built scalable ML pipelines."
                 },
                 {
                     "candidate_id": "candidate_2",
                     "years_experience": 3,
-                    "skill_match_score": 0.7,
-                    "interview_score": 0.6,
+                    "skill_match_score": 70,  # Raw score 0-100
+                    "interview_score": 60,   # Raw score 0-100
                     "salary_expectation": 90000,
                     "resume_text": "Junior ML Engineer with 3 years experience in Python and scikit-learn."
                 },
                 {
                     "candidate_id": "candidate_3",
                     "years_experience": 5,
-                    "skill_match_score": 0.85,
-                    "interview_score": 0.8,
+                    "skill_match_score": 85,  # Raw score 0-100
+                    "interview_score": 80,   # Raw score 0-100
                     "salary_expectation": 120000,
                     "resume_text": "ML Engineer with 5 years experience in Python and TensorFlow. Some production experience."
                 }
@@ -204,8 +204,8 @@ class TestEdgeCases:
                 {
                     "candidate_id": "only_candidate",
                     "years_experience": 5,
-                    "skill_match_score": 0.8,
-                    "interview_score": 0.7,
+                    "skill_match_score": 80,  # Raw score 0-100
+                    "interview_score": 70,   # Raw score 0-100
                     "salary_expectation": 100000,
                     "resume_text": "Test resume"
                 }
@@ -226,8 +226,8 @@ class TestEdgeCases:
             candidates.append({
                 "candidate_id": f"candidate_{i}",
                 "years_experience": 5 + i,
-                "skill_match_score": 0.7 + (i * 0.02),
-                "interview_score": 0.6 + (i * 0.03),
+                "skill_match_score": 70 + (i * 2),  # Raw score 0-100
+                "interview_score": 60 + (i * 3),   # Raw score 0-100
                 "salary_expectation": 80000 + (i * 5000),
                 "resume_text": f"Test resume for candidate {i}"
             })
