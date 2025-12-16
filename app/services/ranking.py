@@ -1,24 +1,30 @@
 from typing import List
 import joblib
 import numpy as np
+import logging
+from pathlib import Path
 
 from app.schemas import Candidate, RankedCandidate
 from app.nlp.similarity import compute_similarity
+from app.config import config
 
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # -------------------------------
-# Model selection
+# Configuration from config module
 # -------------------------------
-MODEL_TYPE = "linear"  # options: "linear", "gboost"
+MODEL_TYPE = config.MODEL_TYPE
+MODEL_PATH = config.get_model_path()
 
-if MODEL_TYPE == "linear":
-    MODEL_PATH = "app/ml/models/linear.pkl"
-elif MODEL_TYPE == "gboost":
-    MODEL_PATH = "app/ml/models/gboost.pkl"
-else:
-    raise ValueError("Invalid MODEL_TYPE")
-
-MODEL = joblib.load(MODEL_PATH)
+# Load model with error handling
+try:
+    MODEL = joblib.load(MODEL_PATH)
+    logger.info(f"Loaded {MODEL_TYPE} model from {MODEL_PATH}")
+except FileNotFoundError:
+    raise FileNotFoundError(f"Model file not found at {MODEL_PATH}. Please ensure the model is trained and available.")
+except Exception as e:
+    raise Exception(f"Failed to load model: {str(e)}")
 
 
 # -------------------------------
@@ -43,69 +49,120 @@ def rank_candidates_logic(
 ) -> List[RankedCandidate]:
     """
     Rank candidates using structured ML score + semantic similarity.
+    
+    Args:
+        candidates: List of Candidate objects to rank
+        job_description: Job description text for semantic matching
+        
+    Returns:
+        List of RankedCandidate objects with ranks and final scores
+        
+    Raises:
+        ValueError: If input validation fails
+        Exception: For processing errors
     """
+    logger.info(f"Starting ranking process for {len(candidates)} candidates")
 
+    # Input validation
     if not candidates:
+        logger.warning("Empty candidate list provided")
         return []
+    
+    if not job_description or not job_description.strip():
+        logger.error("Job description is empty or invalid")
+        raise ValueError("Job description cannot be empty")
+    
+    # Validate candidate data
+    for candidate in candidates:
+        if not candidate.candidate_id or not candidate.candidate_id.strip():
+            raise ValueError(f"Candidate missing valid ID: {candidate}")
+        
+        if not candidate.resume_text or not candidate.resume_text.strip():
+            logger.warning(f"Candidate {candidate.candidate_id} has empty resume text")
+        
+        # Validate numeric ranges
+        if not (0 <= candidate.skill_match_score <= 1):
+            raise ValueError(f"Skill match score must be between 0 and 1, got {candidate.skill_match_score}")
+        
+        if not (0 <= candidate.interview_score <= 1):
+            raise ValueError(f"Interview score must be between 0 and 1, got {candidate.interview_score}")
 
     # Collect values for normalization
-    exp_values = [c.years_experience for c in candidates]
-    salary_values = [c.salary_expectation for c in candidates]
+    try:
+        exp_values = [c.years_experience for c in candidates]
+        salary_values = [c.salary_expectation for c in candidates]
 
-    norm_exp = min_max_normalize(exp_values)
-    norm_salary = min_max_normalize(salary_values)
+        norm_exp = min_max_normalize(exp_values)
+        norm_salary = min_max_normalize(salary_values)
+    except Exception as e:
+        logger.error(f"Normalization failed: {str(e)}")
+        raise Exception("Failed to normalize candidate features")
 
     scored_candidates = []
 
     for idx, candidate in enumerate(candidates):
+        try:
+            # -------------------------------
+            # Structured ML features
+            # -------------------------------
+            features = np.array([
+                norm_exp[idx],
+                candidate.skill_match_score,
+                candidate.interview_score,
+                norm_salary[idx]
+            ]).reshape(1, -1)
 
-        # -------------------------------
-        # Structured ML features
-        # -------------------------------
-        features = np.array([
-            norm_exp[idx],
-            candidate.skill_match_score,
-            candidate.interview_score,
-            norm_salary[idx]
-        ]).reshape(1, -1)
+            structured_score = float(MODEL.predict(features)[0])
+            logger.debug(f"Candidate {candidate.candidate_id}: structured score = {structured_score:.3f}")
 
-        structured_score = float(MODEL.predict(features)[0])
+            # -------------------------------
+            # Semantic similarity (NLP)
+            # -------------------------------
+            semantic_score = compute_similarity(
+                job_text=job_description,
+                resume_text=candidate.resume_text
+            )
+            logger.debug(f"Candidate {candidate.candidate_id}: semantic score = {semantic_score:.3f}")
 
-        # -------------------------------
-        # Semantic similarity (NLP)
-        # -------------------------------
-        semantic_score = compute_similarity(
-            job_text=job_description,
-            resume_text=candidate.resume_text
-        )
+            # -------------------------------
+            # Final combined score
+            # -------------------------------
+            FINAL_SCORE = (
+                0.6 * structured_score +
+                0.4 * semantic_score
+            )
+            
+            logger.info(f"Candidate {candidate.candidate_id}: final score = {FINAL_SCORE:.3f}")
 
-        # -------------------------------
-        # Final combined score
-        # -------------------------------
-        FINAL_SCORE = (
-            0.6 * structured_score +
-            0.4 * semantic_score
-        )
-
-        scored_candidates.append({
-            "candidate_id": candidate.candidate_id,
-            "final_score": FINAL_SCORE
-        })
+            scored_candidates.append({
+                "candidate_id": candidate.candidate_id,
+                "final_score": FINAL_SCORE
+            })
+            
+        except Exception as e:
+            logger.error(f"Failed to process candidate {candidate.candidate_id}: {str(e)}")
+            raise Exception(f"Failed to process candidate {candidate.candidate_id}: {str(e)}")
 
     # -------------------------------
     # Sorting & ranking
     # -------------------------------
-    scored_candidates.sort(
-        key=lambda x: (-x["final_score"], x["candidate_id"])
-    )
-
-    ranked = [
-        RankedCandidate(
-            candidate_id=item["candidate_id"],
-            rank=rank,
-            final_score=item["final_score"]
+    try:
+        scored_candidates.sort(
+            key=lambda x: (-x["final_score"], x["candidate_id"])
         )
-        for rank, item in enumerate(scored_candidates, start=1)
-    ]
 
-    return ranked
+        ranked = [
+            RankedCandidate(
+                candidate_id=item["candidate_id"],
+                rank=rank,
+                final_score=item["final_score"]
+            )
+            for rank, item in enumerate(scored_candidates, start=1)
+        ]
+        
+        logger.info(f"Successfully ranked {len(ranked)} candidates")
+        return ranked
+        
+    except Exception as e:
+        logger.error(f"Ranking failed during sorting: {str(e)}")
+        raise Exception("Failed to complete ranking process")
