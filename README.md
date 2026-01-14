@@ -100,4 +100,5 @@ Used for readiness checks and operational monitoring.
 - NumPy
 - Pydantic
 - Uvicorn
+- Pytest
 
