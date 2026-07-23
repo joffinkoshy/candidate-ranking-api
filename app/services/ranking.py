@@ -1,111 +1,130 @@
+"""Core ranking orchestrator.
+
+Full pipeline (when an LLM key is configured):
+  1. Normalize structured features per request (fair comparison within one job).
+  2. Structured score  <- sklearn regression model.
+  3. Build a hybrid index (dense Chroma + sparse BM25) over resume chunks.
+  4. Per candidate: extract a structured profile (small LLM), retrieve top-k
+     evidence via hybrid search + RRF, and have a strong LLM judge score the fit
+     with grounded citations.
+  5. Blend structured score + judge score, rank deterministically.
+
+Without a key (settings.use_llm == False) it degrades gracefully to Phase 1:
+dense-retrieval semantic score blended with the structured score.
+"""
+
 from typing import List
+
 import joblib
 import numpy as np
 
+from app.config import settings
+from app.nlp.embeddings import embed_text
+from app.retrieval.hybrid import retrieve_evidence
+from app.retrieval.index import RetrievalIndex
 from app.schemas import Candidate, RankedCandidate
-from app.nlp.similarity import compute_similarity
+from app.services.ingestion import build_index
+
+_MODEL = None
 
 
-# -------------------------------
-# Model selection
-# -------------------------------
-MODEL_TYPE = "linear"  # options: "linear", "gboost"
-
-if MODEL_TYPE == "linear":
-    MODEL_PATH = "app/ml/models/linear.pkl"
-elif MODEL_TYPE == "gboost":
-    MODEL_PATH = "app/ml/models/gboost.pkl"
-else:
-    raise ValueError("Invalid MODEL_TYPE")
-
-MODEL = joblib.load(MODEL_PATH)
+def _get_ml_model():
+    global _MODEL
+    if _MODEL is None:
+        _MODEL = joblib.load(settings.ml_model_path())
+    return _MODEL
 
 
-# -------------------------------
-# Utility: Min–Max Normalization
-# -------------------------------
 def min_max_normalize(values: List[float]) -> List[float]:
-    min_val = min(values)
-    max_val = max(values)
-
+    min_val, max_val = min(values), max(values)
     if min_val == max_val:
         return [0.5 for _ in values]
-
     return [(v - min_val) / (max_val - min_val) for v in values]
 
 
-# -------------------------------
-# Core Ranking Logic
-# -------------------------------
-def rank_candidates_logic(
-    candidates: List[Candidate],
-    job_description: str
-) -> List[RankedCandidate]:
-    """
-    Rank candidates using structured ML score + semantic similarity.
-    """
+def _dense_semantic_score(index: RetrievalIndex, job_embedding: np.ndarray,
+                          candidate_id: str) -> float:
+    """Mean similarity of a candidate's top-k most job-relevant chunks (0..1)."""
+    hits = index.dense(job_embedding, candidate_id, settings.TOP_K)
+    return float(np.mean([h["similarity"] for h in hits])) if hits else 0.0
 
+
+def rank_candidates_logic(candidates: List[Candidate],
+                          job_description: str) -> List[RankedCandidate]:
     if not candidates:
         return []
 
-    # Collect values for normalization
-    exp_values = [c.years_experience for c in candidates]
-    salary_values = [c.salary_expectation for c in candidates]
+    norm_exp = min_max_normalize([c.years_experience for c in candidates])
+    norm_salary = min_max_normalize([c.salary_expectation for c in candidates])
 
-    norm_exp = min_max_normalize(exp_values)
-    norm_salary = min_max_normalize(salary_values)
+    index = build_index(candidates)
+    job_embedding = embed_text(job_description)
+    model = _get_ml_model()
+    use_llm = settings.use_llm
 
-    scored_candidates = []
+    # Import LLM helpers lazily so dense-only mode never needs the openai client.
+    if use_llm:
+        from app.llm.extract import extract_profile
+        from app.llm.judge import judge_candidate
 
-    for idx, candidate in enumerate(candidates):
-
-        # -------------------------------
-        # Structured ML features
-        # -------------------------------
+    scored = []
+    for idx, cand in enumerate(candidates):
         features = np.array([
             norm_exp[idx],
-            candidate.skill_match_score,
-            candidate.interview_score,
-            norm_salary[idx]
+            cand.skill_match_score,
+            cand.interview_score,
+            norm_salary[idx],
         ]).reshape(1, -1)
+        structured_score = float(model.predict(features)[0])
 
-        structured_score = float(MODEL.predict(features)[0])
+        row = {
+            "candidate_id": cand.candidate_id,
+            "structured_score": structured_score,
+            "semantic_score": None,
+            "judge_score": None,
+            "reasoning": None,
+            "citations": None,
+        }
 
-        # -------------------------------
-        # Semantic similarity (NLP)
-        # -------------------------------
-        semantic_score = compute_similarity(
-            job_text=job_description,
-            resume_text=candidate.resume_text
-        )
+        if use_llm:
+            profile = extract_profile(cand.resume_text)
+            evidence = retrieve_evidence(
+                index, job_description, job_embedding,
+                cand.candidate_id, settings.TOP_K,
+            )
+            verdict = judge_candidate(job_description, profile, evidence)
+            judge_norm = verdict.score / 100.0
+            row["judge_score"] = verdict.score
+            row["reasoning"] = verdict.reasoning
+            row["citations"] = verdict.citations
+            row["final_score"] = (
+                (1.0 - settings.JUDGE_WEIGHT) * structured_score
+                + settings.JUDGE_WEIGHT * judge_norm
+            )
+        else:
+            semantic_score = _dense_semantic_score(
+                index, job_embedding, cand.candidate_id)
+            row["semantic_score"] = semantic_score
+            row["final_score"] = (
+                settings.STRUCTURED_WEIGHT * structured_score
+                + settings.SEMANTIC_WEIGHT * semantic_score
+            )
 
-        # -------------------------------
-        # Final combined score
-        # -------------------------------
-        FINAL_SCORE = (
-            0.6 * structured_score +
-            0.4 * semantic_score
-        )
+        scored.append(row)
 
-        scored_candidates.append({
-            "candidate_id": candidate.candidate_id,
-            "final_score": FINAL_SCORE
-        })
+    # Deterministic: descending score, ties broken by candidate_id.
+    scored.sort(key=lambda x: (-x["final_score"], x["candidate_id"]))
 
-    # -------------------------------
-    # Sorting & ranking
-    # -------------------------------
-    scored_candidates.sort(
-        key=lambda x: (-x["final_score"], x["candidate_id"])
-    )
-
-    ranked = [
+    return [
         RankedCandidate(
             candidate_id=item["candidate_id"],
             rank=rank,
-            final_score=item["final_score"]
+            final_score=item["final_score"],
+            structured_score=item["structured_score"],
+            semantic_score=item["semantic_score"],
+            judge_score=item["judge_score"],
+            reasoning=item["reasoning"],
+            citations=item["citations"],
         )
-        for rank, item in enumerate(scored_candidates, start=1)
+        for rank, item in enumerate(scored, start=1)
     ]
-
-    return ranked

@@ -1,0 +1,51 @@
+{
+  "job_id": "mle-001",
+  "job_description": "Machine Learning Engineer. Must have strong Python, experience building and deploying ML models, and familiarity with NLP, embeddings, or retrieval systems (RAG). Cloud deployment and production experience is a plus.",
+  "candidates": [
+    {
+      "candidate_id": "C1",
+      "years_experience": 6,
+      "skill_match_score": 0.95,
+      "interview_score": 0.9,
+      "salary_expectation": 140,
+      "resume_text": "Senior Machine Learning Engineer. 6 years building and deploying ML models in Python. Built RAG pipelines with sentence embeddings and vector databases. Deployed models on AWS with FastAPI and Docker. Led NLP projects improving retrieval accuracy by 30%.",
+      "human_rank": 1
+    },
+    {
+      "candidate_id": "C2",
+      "years_experience": 3,
+      "skill_match_score": 0.75,
+      "interview_score": 0.8,
+      "salary_expectation": 110,
+      "resume_text": "Machine Learning Engineer with 3 years experience. Strong Python. Trained classification and regression models with scikit-learn and PyTorch. Some exposure to NLP and text embeddings. Deployed a model to production once.",
+      "human_rank": 2
+    },
+    {
+      "candidate_id": "C3",
+      "years_experience": 4,
+      "skill_match_score": 0.6,
+      "interview_score": 0.7,
+      "salary_expectation": 120,
+      "resume_text": "Data Scientist, 4 years. Python, pandas, statistical analysis and dashboards. Built predictive models in notebooks. Limited production deployment experience. No RAG or embeddings work.",
+      "human_rank": 3
+    },
+    {
+      "candidate_id": "C4",
+      "years_experience": 2,
+      "skill_match_score": 0.4,
+      "interview_score": 0.6,
+      "salary_expectation": 90,
+      "resume_text": "Software engineer, 2 years, mostly backend web APIs in Python and Java. Interested in machine learning, took online courses, no professional ML projects yet.",
+      "human_rank": 4
+    },
+    {
+      "candidate_id": "C5",
+      "years_experience": 8,
+      "skill_match_score": 0.2,
+      "interview_score": 0.4,
+      "salary_expectation": 130,
+      "resume_text": "Retail store manager with 8 years experience. Team leadership, inventory, and customer service. No programming or machine learning background.",
+      "human_rank": 5
+    }
+  ]
+}

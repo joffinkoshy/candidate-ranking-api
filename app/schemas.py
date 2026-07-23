@@ -1,42 +1,42 @@
-from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
-class Candidate(BaseModel): # for one candidate
+from pydantic import BaseModel, Field
+
+
+class Candidate(BaseModel):  # a single candidate for a job
     candidate_id: str
-    years_experience: int
-    skill_match_score:float
-    interview_score:float
-    salary_expectation:float
-    resume_text:str
+    years_experience: float = Field(ge=0)
+    skill_match_score: float = Field(ge=0, le=1)
+    interview_score: float = Field(ge=0, le=1)
+    salary_expectation: float = Field(ge=0)
+    resume_text: str
 
-class RankCandidatesRequest(BaseModel): # list of candidates each list applying for unique job_id
+
+class RankCandidatesRequest(BaseModel):
     job_id: str
-    job_description:str
+    job_description: str
     candidates: List[Candidate]
+
 
 class RankedCandidate(BaseModel):
     candidate_id: str
     rank: int
     final_score: float
+    # Explainability breakdown of the blended final score.
+    structured_score: Optional[float] = None
+    semantic_score: Optional[float] = None
+    judge_score: Optional[float] = None       # 0..100 from the LLM judge
+    reasoning: Optional[str] = None           # grounded justification
+    citations: Optional[List[str]] = None     # exact phrases from the resume
+
 
 class RankCandidatesResponse(BaseModel):
     ranked_candidates: List[RankedCandidate]
 
-class JobText(BaseModel):
-    job_id:str
-    description:str
 
-class ResumeText(BaseModel):
-    candidate_id:str
-    resume_text:str
-
-
-class ResumeMatchScore(BaseModel):
-    candidate_id: str
-    similarity_score: float
-
-class ResumeJobMatchResponse(BaseModel):
-    matches: List[ResumeMatchScore]
-
-
-
+# --- Structured extraction (Phase 3): resume text -> validated profile ---
+class ExtractedProfile(BaseModel):
+    years_experience: float = Field(ge=0)
+    skills: List[str] = Field(default_factory=list)
+    education: str = ""
+    seniority: str = "unknown"  # junior | mid | senior | unknown

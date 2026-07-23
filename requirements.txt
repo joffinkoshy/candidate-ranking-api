@@ -16,3 +16,11 @@ threadpoolctl==3.6.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.38.0
+
+# --- RAG / LLM stack (Tier 1.5) ---
+sentence-transformers>=3.0.0   # local embeddings (all-MiniLM-L6-v2)
+chromadb>=0.5.0                # vector store for dense retrieval
+rank-bm25>=0.2.2               # keyword search (Phase 2: hybrid)
+openai>=1.40.0                 # OpenAI-compatible client for Groq (Phase 3+)
+python-dotenv>=1.0.0           # load GROQ_API_KEY from a local .env file
+pytest>=8.0.0                  # test runner
