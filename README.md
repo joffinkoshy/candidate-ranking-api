@@ -1,5 +1,11 @@
 # RAG-Powered Candidate Ranking API
 
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.124-009688?logo=fastapi&logoColor=white)
+![RAG](https://img.shields.io/badge/RAG-hybrid%20search-orange)
+![LLM](https://img.shields.io/badge/LLM-as--judge-8A2BE2)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 Ranks job candidates for a single opening by combining **structured ML scoring**
 with a **Retrieval-Augmented Generation (RAG)** pipeline: it reads raw resumes,
 retrieves the passages most relevant to the job, and uses an LLM to score and
@@ -121,6 +127,22 @@ and `citations` per candidate.
 
 ```bash
 python -m eval.evaluate      # prints Kendall's tau + top-3 overlap vs. human labels
+```
+
+Sample run against the golden set (the LLM judge's `judge` scores drive the order):
+
+```
+Predicted vs. human ranking
+----------------------------------------------------
+cand  pred  human  final    judge
+C1    1     1      0.848    98
+C2    2     2      0.684    80
+C3    3     3      0.412    40
+C4    4     4      0.256    20
+C5    5     5      0.136    0
+----------------------------------------------------
+Kendall's tau : 1.000   (1.0 = perfect order)
+Top-3 overlap : 100%
 ```
 
 ## Tests
