@@ -37,6 +37,13 @@ class Settings:
     # --- Retrieval ---
     TOP_K = int(os.getenv("TOP_K", "4"))
 
+    # --- Reranking (cross-encoder, second-stage over the RRF-fused pool) ---
+    ENABLE_RERANK = _flag("ENABLE_RERANK", True)
+    RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    # How much bigger the fused candidate pool is than the final k, so the
+    # reranker has real choices to make instead of just reordering k items.
+    RERANK_POOL_MULTIPLIER = int(os.getenv("RERANK_POOL_MULTIPLIER", "3"))
+
     # --- Structured ML scorer ---
     ML_MODEL_TYPE = os.getenv("ML_MODEL_TYPE", "linear")  # "linear" | "gboost"
 
